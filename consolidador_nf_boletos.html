@@ -492,7 +492,7 @@ async function analyseAllPending() {
 // e.g. "Boletos_874.pdf" → "874"
 // ─────────────────────────────────────────────
 function extractNFFromFilename(name) {
-  const m = name.match(/[_\-]0*(\d{2,6})(?:\.\w+)?$/i);
+  const m = name.match(/[\s_\-]0*(\d{2,6})(?:\.\w+)?$/i);
   return m ? String(parseInt(m[1], 10)) : null;
 }
 
@@ -526,9 +526,18 @@ function extractNF(text) {
   m = text.match(/\b(\d{2,6})\s+\d+\/\d+\s+\d/);
   if (m) return String(parseInt(m[1], 10));
 
+  // 4b. Bradesco boleto: "5161 DM" — número da NF seguido do código DM (Duplicata Mercantil)
+  // Funciona independente da ordem de extração do PDF.js (linha-a-linha ou coluna-a-coluna)
+  m = text.match(/\b(\d{2,6})\s+DM\b/);
+  if (m) return String(parseInt(m[1], 10));
+
+  // 4c. Bradesco boleto: coluna "Nº do documento" imediatamente seguida do número (extração coluna-a-coluna)
+  m = text.match(/N[°º]\s+do\s+documento\s+(\d{2,6})/i);
+  if (m) return String(parseInt(m[1], 10));
+
   // 5. Triple-dotted NF: 000.000.080 ou 000.001.005 (NF ≥ 1000)
-  // Remove pontos e parseia completo: "000.001.005" → 1005, "000.000.080" → 80
-  const ms = text.match(/\b\d{3}\.\d{3}\.\d{1,4}(?![.\d])/g);
+  // Lookahead exclui / para não capturar CNPJs (ex: 009.468.013/0001-64)
+  const ms = text.match(/\b\d{3}\.\d{3}\.\d{1,4}(?![.\d/])/g);
   if (ms) return String(parseInt(ms[0].replace(/\./g, ''), 10));
 
   // 6. PB&Cia Boleto: "10/04/2026  860  DM" — date then NF then 2-letter doc type
