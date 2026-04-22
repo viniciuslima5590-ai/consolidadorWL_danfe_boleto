@@ -502,16 +502,13 @@ function extractNFFromFilename(name) {
 function extractNF(text) {
   let m;
 
-  // 1. PB&Cia DANFE: "N°: 000.862" or "Nº. 000.862" — colon OR dot after degree symbol (checked FIRST)
-  // PDF.js splits "N°:" and "000.862" into SEPARATE items, joined with space → "Nº. 000.862"
-  // So we accept both colon and dot as separator; capture up to 20 chars, take max digit group
+  // 1. PB&Cia DANFE: "N°: 000.862" or "Nº. 000.862" or "N°: 001.005" (NF ≥ 1000)
+  // Remove pontos e parseia o número completo: "000.862" → 862, "001.005" → 1005
   m = text.match(/N[°º]\s*[.:]\s*([\d\s.]{1,20})/);
   if (m) {
-    const groups = m[1].match(/\d+/g);
-    if (groups) {
-      const nums = groups.map(n => parseInt(n, 10)).filter(n => n > 0);
-      if (nums.length) return String(Math.max(...nums));
-    }
+    const raw = m[1].replace(/\s/g, '');
+    const asNum = parseInt(raw.replace(/\./g, ''), 10);
+    if (asNum > 0) return String(asNum);
   }
 
   // 2. NEW ARRIVAL DANFE: "Nº 20.617" — NF com ponto separador de milhar (espaço entre Nº e número)
@@ -529,10 +526,10 @@ function extractNF(text) {
   m = text.match(/\b(\d{2,6})\s+\d+\/\d+\s+\d/);
   if (m) return String(parseInt(m[1], 10));
 
-  // 5. Triple-dotted NF: 000.000.080
-  // Negative lookahead (?![.\d]) prevents matching "073" from inscrição estadual "000.087.073.599"
-  const ms = text.match(/\b\d{3}\.\d{3}\.(\d{1,4})(?![.\d])/g);
-  if (ms) return String(parseInt(ms[0].split('.').pop(), 10));
+  // 5. Triple-dotted NF: 000.000.080 ou 000.001.005 (NF ≥ 1000)
+  // Remove pontos e parseia completo: "000.001.005" → 1005, "000.000.080" → 80
+  const ms = text.match(/\b\d{3}\.\d{3}\.\d{1,4}(?![.\d])/g);
+  if (ms) return String(parseInt(ms[0].replace(/\./g, ''), 10));
 
   // 6. PB&Cia Boleto: "10/04/2026  860  DM" — date then NF then 2-letter doc type
   // PDF.js outputs items separately: "10/04/2026" "860" "DM" joined with spaces
